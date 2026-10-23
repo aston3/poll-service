@@ -62,6 +62,8 @@
       </section>
       <section id="detail" hidden>
         <h2 id="poll-question"></h2>
+        <p id="poll-state" role="status"></p>
+        <button type="button" id="close-poll">Закрыть опрос</button>
         <p class="muted">Выберите вариант, чтобы проголосовать.</p>
         <div id="vote-options"></div>
         <div id="results" aria-live="polite"></div>
@@ -141,6 +143,8 @@ async function openPoll(id) {
   const poll = await api('/polls/' + id);
   const results = await api('/polls/' + id + '/results');
   selectedId = id;
+  document.getElementById('poll-state').textContent = poll.closed ? 'Опрос закрыт' : 'Голосование открыто';
+  document.getElementById('close-poll').disabled = poll.closed;
   document.getElementById('poll-question').textContent = poll.question;
   document.getElementById('vote-message').textContent = '';
   const choices = document.getElementById('vote-options');
@@ -149,6 +153,7 @@ async function openPoll(id) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'vote-option';
+    button.disabled = poll.closed;
     button.textContent = option.text;
     button.addEventListener('click', async () => {
       const pollId = id;
@@ -198,6 +203,29 @@ document.getElementById('refresh-results').addEventListener('click', async () =>
     const results = await api('/polls/' + id + '/results');
     if (selectedId === id) renderResults(results);
   } catch (error) { showError(error); }
+});
+document.getElementById('close-poll').addEventListener('click', async () => {
+  if (selectedId === null) return;
+
+  const id = selectedId;
+  const button = document.getElementById('close-poll');
+
+  button.disabled = true;
+  message.textContent = '';
+
+  try {
+    await api('/polls/' + id + '/close', {});
+
+    if (selectedId === id) {
+      await openPoll(id);
+    }
+  } catch (error) {
+    showError(error);
+
+    if (selectedId === id) {
+      button.disabled = false;
+    }
+  }
 });
 loadPolls().catch(showError);
 </script>
