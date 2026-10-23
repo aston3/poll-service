@@ -145,6 +145,13 @@ async def get_poll(poll_id: int):
 @app.post("/polls/{poll_id}/votes", response_model=PollResults)
 async def vote(poll_id: int, data: VoteCreate):
     poll = find_poll(poll_id)
+
+    if poll["closed"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Опрос закрыт. Голосование завершено",
+        )
+
     if data.option_id not in poll["votes"]:
         raise HTTPException(status_code=422, detail="Такого варианта ответа нет в этом опросе")
     poll["votes"][data.option_id] += 1
