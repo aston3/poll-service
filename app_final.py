@@ -116,6 +116,7 @@ async def create_poll(data: PollCreate):
         "votes": {option["id"]: 0 for option in options},
     }
     polls[poll_id] = poll
+    logger.info("Poll created id=%s", poll_id)
     return poll
 
 
@@ -135,6 +136,13 @@ async def vote(poll_id: int, data: VoteCreate):
     if data.option_id not in poll["votes"]:
         raise HTTPException(status_code=422, detail="Такого варианта ответа нет в этом опросе")
     poll["votes"][data.option_id] += 1
+
+    logger.info(
+    "Vote accepted poll_id=%s option_id=%s",
+    poll_id,
+    data.option_id,
+    )
+
     return results_for(poll)
 
 
