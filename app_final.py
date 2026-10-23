@@ -61,6 +61,7 @@ class PollView(BaseModel):
     id: int
     question: str
     options: list[OptionView]
+    closed: bool
 
 
 class OptionResult(OptionView):
@@ -114,9 +115,20 @@ async def create_poll(data: PollCreate):
         "question": data.question,
         "options": options,
         "votes": {option["id"]: 0 for option in options},
+        "closed": False,
     }
     polls[poll_id] = poll
     logger.info("Poll created id=%s", poll_id)
+    return poll
+
+
+@app.post("/polls/{poll_id}/close", response_model=PollView)
+async def close_poll(poll_id: int):
+    poll = find_poll(poll_id)
+    poll["closed"] = True
+
+    logger.info("Poll closed id=%s", poll_id)
+
     return poll
 
 
@@ -133,6 +145,13 @@ async def get_poll(poll_id: int):
 @app.post("/polls/{poll_id}/votes", response_model=PollResults)
 async def vote(poll_id: int, data: VoteCreate):
     poll = find_poll(poll_id)
+
+    if poll["closed"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Опрос закрыт. Голосование завершено",
+        )
+
     if data.option_id not in poll["votes"]:
         raise HTTPException(status_code=422, detail="Такого варианта ответа нет в этом опросе")
     poll["votes"][data.option_id] += 1
