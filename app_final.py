@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
+import os
+
 app = FastAPI(title="Опросы")
 ROOT = Path(__file__).resolve().parent
 polls: dict[int, dict] = {}
@@ -126,3 +128,8 @@ async def get_results(poll_id: int):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/version")
+async def version():
+    return {"version": os.getenv("APP_VERSION", "0.1.0")}
