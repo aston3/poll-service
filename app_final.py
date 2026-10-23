@@ -1,5 +1,6 @@
 """Учебный сервис опросов. Все данные хранятся в памяти процесса."""
 
+from contextlib import asynccontextmanager
 from itertools import count
 from pathlib import Path
 from typing import Annotated
@@ -10,10 +11,24 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 import os
 
+import logging
+
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).with_name(".env"), override=False)
 
-app = FastAPI(title="Опросы")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger("polls")
+
+@asynccontextmanager
+async def lifespan(app):
+    logger.info("Service started")
+    yield
+    logger.info("Service stopped")
+
+app = FastAPI(title="Опросы", lifespan=lifespan)
 ROOT = Path(__file__).resolve().parent
 polls: dict[int, dict] = {}
 poll_ids = count(1)
