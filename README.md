@@ -5,13 +5,13 @@
 
 ## Запуск
 
-Нужен Python 3.12. Выполняй из папки проекта:
+Нужен Python 3.12. Выполнять из папки проекта:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m uvicorn app:app --host 127.0.0.1 --port 8002
+python -m uvicorn app_final:app --host 127.0.0.1 --port 8002
 ```
 
 Страница: http://127.0.0.1:8002/
