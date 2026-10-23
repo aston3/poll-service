@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 import os
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).with_name(".env"), override=False)
+
 app = FastAPI(title="Опросы")
 ROOT = Path(__file__).resolve().parent
 polls: dict[int, dict] = {}
