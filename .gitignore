@@ -1,0 +1,18 @@
+# Python environment and generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Build artifacts and editor files
+dist/
+.DS_Store
+.vscode/

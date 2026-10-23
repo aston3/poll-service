@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Опросы</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f5f7; color: #202733; font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 1040px; padding: 40px 24px; margin: auto; }
+    h1, h2 { line-height: 1.25; margin-top: 0; overflow-wrap: anywhere; }
+    h1 { margin-bottom: 8px; }
+    h2 { font-size: 22px; }
+    .muted, small { color: #5d6879; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; align-items: start; }
+    section { background: white; padding: 24px; border: 1px solid #dce1e8; border-radius: 12px; min-width: 0; }
+    label { display: block; font-weight: 600; margin: 18px 0 6px; }
+    input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #9ba6b5; border-radius: 7px; font: inherit; }
+    textarea { resize: vertical; }
+    button { font: inherit; padding: 10px 16px; border: 1px solid #c7d0dc; border-radius: 7px; cursor: pointer; background: white; color: #202733; }
+    button:hover { background: #eef2f8; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .primary { background: #2855bf; color: white; border-color: #2855bf; margin-top: 18px; }
+    .primary:hover { background: #20469e; }
+    #poll-list { display: grid; gap: 8px; margin-top: 16px; }
+    #poll-list button, .vote-option { text-align: left; width: 100%; overflow-wrap: anywhere; }
+    #poll-list button[aria-current="true"] { border-color: #2855bf; background: #edf2ff; }
+    #detail { margin-top: 24px; }
+    #vote-options { display: grid; gap: 8px; }
+    #results { margin-top: 20px; }
+    .result-label { display: flex; justify-content: space-between; gap: 16px; overflow-wrap: anywhere; }
+    .result-label span:last-child { white-space: nowrap; }
+    progress { display: block; width: 100%; height: 14px; margin: 6px 0 16px; accent-color: #2855bf; }
+    #message { color: #a11f27; overflow-wrap: anywhere; }
+    a { color: #2855bf; }
+    @media(max-width: 760px) { .columns { grid-template-columns: 1fr; } main { padding: 24px 16px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Опросы</h1>
+  <p class="muted">Задайте вопрос, соберите голоса и посмотрите результаты.</p>
+  <p id="message" role="alert"></p>
+  <div class="columns">
+    <section>
+      <h2>Новый опрос</h2>
+      <form id="create-form">
+        <label for="question">Вопрос</label>
+        <input id="question" required maxlength="200" placeholder="Какой язык изучать следующим?">
+        <label for="options">Варианты ответа</label>
+        <textarea id="options" required rows="5" placeholder="Python&#10;Go&#10;Rust" aria-describedby="options-help"></textarea>
+        <small id="options-help">Каждый вариант с новой строки. От 2 до 8 вариантов, до 100 символов каждый.</small>
+        <br><button class="primary" id="create-button" type="submit">Создать опрос</button>
+      </form>
+      <p><small>Данные хранятся до перезапуска сервера. В учебной версии можно голосовать повторно.</small></p>
+    </section>
+    <div>
+      <section>
+        <h2>Все опросы</h2>
+        <button type="button" id="refresh-list">Обновить список</button>
+        <div id="poll-list" aria-live="polite"></div>
+      </section>
+      <section id="detail" hidden>
+        <h2 id="poll-question"></h2>
+        <p class="muted">Выберите вариант, чтобы проголосовать.</p>
+        <div id="vote-options"></div>
+        <div id="results" aria-live="polite"></div>
+        <button type="button" id="refresh-results">Обновить результаты</button>
+        <p id="vote-message" role="status"></p>
+      </section>
+    </div>
+  </div>
+  <p><a href="/docs">Документация API</a></p>
+</main>
+<script>
+const message = document.getElementById('message');
+const list = document.getElementById('poll-list');
+let selectedId = null;
+
+async function api(path, payload) {
+  const response = await fetch(path, payload === undefined ? {} : {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const detail = Array.isArray(data.detail)
+      ? data.detail.map(item => item.msg).join('; ')
+      : data.detail;
+    throw new Error(detail || 'Не удалось выполнить запрос');
+  }
+  return data;
+}
+
+function showError(error) {
+  message.textContent = error.message || 'Нет связи с сервером';
+}
+
+async function loadPolls() {
+  const polls = await api('/polls');
+  list.replaceChildren();
+  if (!polls.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'Опросов пока нет. Создайте первый.';
+    empty.className = 'muted';
+    list.append(empty);
+  }
+  for (const poll of polls) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = poll.question;
+    button.setAttribute('aria-current', String(poll.id === selectedId));
+    button.addEventListener('click', () => openPoll(poll.id).catch(showError));
+    list.append(button);
+  }
+}
+
+function renderResults(data) {
+  const container = document.getElementById('results');
+  container.replaceChildren();
+  const heading = document.createElement('h3');
+  heading.textContent = 'Всего голосов: ' + data.total_votes;
+  container.append(heading);
+  for (const option of data.options) {
+    const label = document.createElement('div');
+    label.className = 'result-label';
+    const text = document.createElement('span');
+    text.textContent = option.text;
+    const count = document.createElement('span');
+    count.textContent = option.votes + ' · ' + option.percent + '%';
+    label.append(text, count);
+    const bar = document.createElement('progress');
+    bar.max = 100;
+    bar.value = option.percent;
+    bar.setAttribute('aria-label', option.text + ': ' + option.percent + '%');
+    container.append(label, bar);
+  }
+}
+
+async function openPoll(id) {
+  message.textContent = '';
+  const poll = await api('/polls/' + id);
+  const results = await api('/polls/' + id + '/results');
+  selectedId = id;
+  document.getElementById('poll-question').textContent = poll.question;
+  document.getElementById('vote-message').textContent = '';
+  const choices = document.getElementById('vote-options');
+  choices.replaceChildren();
+  for (const option of poll.options) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'vote-option';
+    button.textContent = option.text;
+    button.addEventListener('click', async () => {
+      const pollId = id;
+      message.textContent = '';
+      const buttons = [...choices.querySelectorAll('button')];
+      buttons.forEach(item => item.disabled = true);
+      try {
+        const data = await api('/polls/' + pollId + '/votes', {option_id: option.id});
+        if (selectedId === pollId) {
+          renderResults(data);
+          document.getElementById('vote-message').textContent = 'Голос учтён.';
+        }
+      } catch (error) { showError(error); }
+      finally { buttons.forEach(item => item.disabled = false); }
+    });
+    choices.append(button);
+  }
+  renderResults(results);
+  document.getElementById('detail').hidden = false;
+  await loadPolls();
+}
+
+document.getElementById('create-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = document.getElementById('create-button');
+  button.disabled = true;
+  message.textContent = '';
+  try {
+    const poll = await api('/polls', {
+      question: document.getElementById('question').value,
+      options: document.getElementById('options').value.split('\n').map(text => text.trim()).filter(Boolean)
+    });
+    event.target.reset();
+    await openPoll(poll.id);
+  } catch (error) { showError(error); }
+  finally { button.disabled = false; }
+});
+document.getElementById('refresh-list').addEventListener('click', () => {
+  message.textContent = '';
+  loadPolls().catch(showError);
+});
+document.getElementById('refresh-results').addEventListener('click', async () => {
+  if (selectedId === null) return;
+  const id = selectedId;
+  message.textContent = '';
+  try {
+    const results = await api('/polls/' + id + '/results');
+    if (selectedId === id) renderResults(results);
+  } catch (error) { showError(error); }
+});
+loadPolls().catch(showError);
+</script>
+</body>
+</html>
