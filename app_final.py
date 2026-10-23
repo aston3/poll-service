@@ -121,3 +121,8 @@ async def vote(poll_id: int, data: VoteCreate):
 @app.get("/polls/{poll_id}/results", response_model=PollResults)
 async def get_results(poll_id: int):
     return results_for(find_poll(poll_id))
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
