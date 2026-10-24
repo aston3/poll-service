@@ -23,3 +23,25 @@ jobs:
         run: python -m pip check
       - name: Run tests
         run: python -m pytest -v
+    
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v6
+
+      - name: Upload tested application
+        uses: actions/upload-artifact@v6
+        with:
+          name: poll-service
+          path: |
+            app_final.py
+            index.html
+            requirements.txt
+            README.md
+            .env.example
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
